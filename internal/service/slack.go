@@ -95,3 +95,14 @@ func (s *SlackService) storeChannels(channels []slackapi.Channel) error {
 	}
 	return nil
 }
+
+// BackupChannelMessages initiates message collection for a channel
+func (s *SlackService) BackupChannelMessages(channelID string) error {
+	logger.Info.Printf("Starting message backup for channel %s", channelID)
+
+	if err := s.CollectMessages(channelID); err != nil {
+		return fmt.Errorf("failed to backup messages for channel %s: %w", channelID, err)
+	}
+
+	return nil
+}

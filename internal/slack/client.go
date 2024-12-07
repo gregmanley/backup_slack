@@ -55,3 +55,43 @@ func (c *Client) ValidateAuth() (*slack.AuthTestResponse, error) {
 
 	return resp, nil
 }
+
+// GetChannelMessages fetches messages from a channel since a specific timestamp
+func (c *Client) GetChannelMessages(channelID string, oldest string, cursor string) ([]slack.Message, string, error) {
+	if err := c.rateLimiter.Wait(c.ctx); err != nil {
+		return nil, "", fmt.Errorf("rate limiter error: %w", err)
+	}
+
+	params := &slack.GetConversationHistoryParameters{
+		ChannelID: channelID,
+		Limit:     100,
+		Oldest:    oldest,
+		Cursor:    cursor,
+	}
+
+	resp, err := c.api.GetConversationHistory(params)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get channel history: %w", err)
+	}
+
+	return resp.Messages, resp.ResponseMetadata.Cursor, nil
+}
+
+// GetMessageReplies fetches all replies in a thread
+func (c *Client) GetMessageReplies(channelID, threadTS string) ([]slack.Message, error) {
+	if err := c.rateLimiter.Wait(c.ctx); err != nil {
+		return nil, fmt.Errorf("rate limiter error: %w", err)
+	}
+
+	params := &slack.GetConversationRepliesParameters{
+		ChannelID: channelID,
+		Timestamp: threadTS,
+	}
+
+	messages, _, _, err := c.api.GetConversationReplies(params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get thread replies: %w", err)
+	}
+
+	return messages, nil
+}

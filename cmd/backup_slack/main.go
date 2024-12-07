@@ -59,7 +59,16 @@ func main() {
 	if err := slackService.Initialize(cfg.SlackChannels); err != nil {
 		logger.Error.Fatalf("Failed to initialize Slack service: %v", err)
 	}
-
 	logger.Info.Println("Slack service initialized successfully")
 	logger.Info.Printf("Configured to backup %d channels: %v", len(cfg.SlackChannels), cfg.SlackChannels)
+
+	// Start backing up messages from each channel
+	for _, channelID := range cfg.SlackChannels {
+		logger.Info.Printf("Starting backup for channel %s", channelID)
+		if err := slackService.BackupChannelMessages(channelID); err != nil {
+			logger.Error.Printf("Failed to backup channel %s: %v", channelID, err)
+			continue
+		}
+		logger.Info.Printf("Completed backup for channel %s", channelID)
+	}
 }
