@@ -8,6 +8,7 @@ import (
 	"backup_slack/internal/config"
 	"backup_slack/internal/database"
 	"backup_slack/internal/logger"
+	"backup_slack/internal/service"
 
 	"github.com/joho/godotenv"
 )
@@ -34,8 +35,8 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	// Initialize logger
-	if err := logger.Init(cfg.LogPath); err != nil {
+	// Initialize logger with log level
+	if err := logger.Init(cfg.LogPath, logger.ParseLogLevel(cfg.LogLevel)); err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
 
@@ -53,6 +54,12 @@ func main() {
 
 	logger.Info.Println("Database initialized successfully")
 
-	logger.Info.Println("Slack backup system starting...")
+	// Initialize Slack service
+	slackService := service.NewSlackService(cfg.SlackAPIToken, db)
+	if err := slackService.Initialize(cfg.SlackChannels); err != nil {
+		logger.Error.Fatalf("Failed to initialize Slack service: %v", err)
+	}
+
+	logger.Info.Println("Slack service initialized successfully")
 	logger.Info.Printf("Configured to backup %d channels: %v", len(cfg.SlackChannels), cfg.SlackChannels)
 }

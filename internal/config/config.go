@@ -14,6 +14,7 @@ type Config struct {
 	LogPath       string
 	MaxRetries    int
 	BatchSize     int
+	LogLevel      string
 }
 
 // Load returns a Config struct populated with current configuration
@@ -23,9 +24,9 @@ func Load() (*Config, error) {
 	var missingVars []string
 
 	// Required variables
-	c.SlackAPIToken = getEnvOrDefault("SLACK_APP_TOKEN", "")
+	c.SlackAPIToken = getEnvOrDefault("SLACK_BOT_TOKEN", "")
 	if c.SlackAPIToken == "" {
-		missingVars = append(missingVars, "SLACK_APP_TOKEN")
+		missingVars = append(missingVars, "SLACK_BOT_TOKEN")
 	}
 
 	channels := getEnvOrDefault("SLACK_CHANNELS", "")
@@ -52,6 +53,7 @@ func Load() (*Config, error) {
 	// Optional variables with defaults
 	c.MaxRetries = getEnvAsIntOrDefault("MAX_RETRIES", 3)
 	c.BatchSize = getEnvAsIntOrDefault("BATCH_SIZE", 100)
+	c.LogLevel = getEnvOrDefault("LOG_LEVEL", "INFO")
 
 	if len(missingVars) > 0 {
 		return nil, fmt.Errorf("missing required environment variables: %s", strings.Join(missingVars, ", "))

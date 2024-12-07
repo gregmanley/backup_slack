@@ -31,6 +31,7 @@ var migrations = []Migration{
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL,
 			channel_type TEXT NOT NULL,
+			is_archived BOOLEAN DEFAULT FALSE,
 			created_at DATETIME NOT NULL,
 			topic TEXT,
 			purpose TEXT
