@@ -2,7 +2,7 @@
 
 ## Description
 
-Add your project description here.
+Go utility to back up Slack channels to a local SQLite database.
 
 ## Getting Started
 
@@ -14,7 +14,7 @@ Add your project description here.
 
 1. Clone the repository
    ```bash
-   git clone https://github.com/yourusername/backup_slack.git
+   git clone https://github.com/gregmanley/backup_slack.git
    ```
 
 2. Install dependencies
