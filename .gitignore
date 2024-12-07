@@ -25,3 +25,4 @@ logs/
 *.log
 tmp/
 temp/
+reference_docs/
