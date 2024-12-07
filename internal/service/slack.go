@@ -24,7 +24,7 @@ func NewSlackService(token string, db *database.DB) *SlackService {
 }
 
 // Initialize validates authentication and ensures we can access specified channels
-func (s *SlackService) Initialize(targetChannels []string) error {
+func (s *SlackService) Initialize(targetChannelIDs []string) error {
 	// Validate authentication
 	auth, err := s.client.ValidateAuth()
 	if err != nil {
@@ -38,23 +38,24 @@ func (s *SlackService) Initialize(targetChannels []string) error {
 		return fmt.Errorf("failed to list channels: %w", err)
 	}
 
-	// Create map of available channels
+	// Create ID->Channel map for validation
 	channelMap := make(map[string]slackapi.Channel)
 	for _, ch := range channels {
-		channelMap[ch.Name] = ch
+		channelMap[ch.ID] = ch
 	}
 
-	// Filter to only store target channels
+	// Verify access to target channels and build filtered list
 	var targetChannelData []slackapi.Channel
-	for _, targetName := range targetChannels {
-		if ch, exists := channelMap[targetName]; exists {
+	for _, targetID := range targetChannelIDs {
+		if ch, exists := channelMap[targetID]; exists {
 			targetChannelData = append(targetChannelData, ch)
+			logger.Info.Printf("Will backup channel: %s (ID: %s)", ch.Name, ch.ID)
 		} else {
-			return fmt.Errorf("no access to channel: %s", targetName)
+			return fmt.Errorf("no access to channel ID: %s", targetID)
 		}
 	}
 
-	// Store only the target channels in database
+	// Store only target channels in database
 	if err := s.storeChannels(targetChannelData); err != nil {
 		return fmt.Errorf("failed to store channels: %w", err)
 	}
