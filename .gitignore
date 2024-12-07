@@ -1,0 +1,27 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+
+
+# Environment variables & secrets
+.env
+*.env
+secrets.txt
+
+# IDE specific files
+.idea/
+.vscode/
+
+# MacOS specific files
+.DS_Store
+.Spotlight-V100
+
+# Application specific
+logs/
+*.log
+tmp/
+temp/
