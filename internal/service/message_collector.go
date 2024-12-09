@@ -1,11 +1,12 @@
 package service
 
 import (
+	"fmt"
+	"time"
+
 	"backup_slack/internal/database"
 	"backup_slack/internal/logger"
 	"database/sql"
-	"fmt"
-	"time"
 
 	"github.com/slack-go/slack"
 )

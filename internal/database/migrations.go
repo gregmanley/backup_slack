@@ -1,8 +1,9 @@
 package database
 
 import (
-	"database/sql"
 	"fmt"
+
+	"database/sql"
 )
 
 type Migration struct {

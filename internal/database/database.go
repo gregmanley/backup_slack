@@ -1,12 +1,13 @@
 package database
 
 import (
-	"backup_slack/internal/logger"
-	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
+
+	"backup_slack/internal/logger"
+	"database/sql"
 
 	_ "github.com/mattn/go-sqlite3"
 )
