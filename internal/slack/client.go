@@ -66,9 +66,10 @@ func (c *Client) GetChannelMessages(channelID string, latest string, cursor stri
 
 	params := &slack.GetConversationHistoryParameters{
 		ChannelID: channelID,
-		Limit:     100,
+		Limit:     200, // Increased from 100 to 200 for better performance
 		Cursor:    cursor,
 		Latest:    latest, // If empty, will get most recent messages
+		Inclusive: false,
 	}
 
 	logger.Debug.Printf("Fetching messages: channel=%s cursor=%s latest=%s",
@@ -81,11 +82,12 @@ func (c *Client) GetChannelMessages(channelID string, latest string, cursor stri
 	}
 
 	logger.Debug.Printf("Successfully retrieved %d messages from Slack API", len(resp.Messages))
+	nextCursor := resp.ResponseMetadata.Cursor
 	if resp.HasMore {
-		logger.Debug.Printf("More messages available, next cursor: %s", resp.ResponseMetadata.Cursor)
+		logger.Debug.Printf("More messages available, next cursor: %s", nextCursor)
 	}
 
-	return resp.Messages, resp.ResponseMetadata.Cursor, nil
+	return resp.Messages, nextCursor, nil
 }
 
 // GetMessageReplies fetches all replies in a thread

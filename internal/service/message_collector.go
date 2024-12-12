@@ -13,18 +13,34 @@ import (
 
 // CollectMessages fetches and stores messages for the specified channel
 func (s *SlackService) CollectMessages(channelID string) (int, error) {
-	var cursor string
-	seenMessages := make(map[string]bool)
-	totalMessages := 0
+	var (
+		latest        string // Will hold the oldest timestamp from previous batch
+		totalMessages = 0
+		seenMessages  = make(map[string]bool)
+	)
 
 	for {
-		// Get latest messages first, use cursor for pagination
-		messages, nextCursor, err := s.client.GetChannelMessages(channelID, "", cursor)
+		// Use latest as timestamp cursor to get next older batch of messages
+		messages, _, err := s.client.GetChannelMessages(channelID, latest, "")
 		if err != nil {
 			return totalMessages, fmt.Errorf("failed to fetch messages: %w", err)
 		}
 
 		logger.Debug.Printf("Retrieved %d messages for channel %s", len(messages), channelID)
+
+		if len(messages) == 0 {
+			logger.Debug.Printf("No more messages to fetch for channel %s", channelID)
+			break
+		}
+
+		// Find oldest message timestamp in this batch to use as cursor for next batch
+		oldest := messages[0].Timestamp
+		for _, msg := range messages {
+			if msg.Timestamp < oldest {
+				oldest = msg.Timestamp
+			}
+		}
+		latest = oldest // Set latest to oldest message timestamp for next iteration
 
 		// Check for messages we've already processed
 		var newMessages []slack.Message
@@ -32,9 +48,8 @@ func (s *SlackService) CollectMessages(channelID string) (int, error) {
 			if exists, err := s.db.MessageExists(msg.Timestamp); err != nil {
 				return totalMessages, fmt.Errorf("failed to check message existence: %w", err)
 			} else if exists {
-				logger.Debug.Printf("Found existing message (ts: %s), stopping collection", msg.Timestamp)
-				// We've hit messages we already have, stop collecting
-				return totalMessages, nil
+				logger.Debug.Printf("Found existing message (ts: %s), continuing to older messages", msg.Timestamp)
+				continue
 			}
 
 			if !seenMessages[msg.Timestamp] {
@@ -43,17 +58,16 @@ func (s *SlackService) CollectMessages(channelID string) (int, error) {
 			}
 		}
 
-		if err := s.processMessages(channelID, newMessages); err != nil {
-			return totalMessages, fmt.Errorf("failed to process messages: %w", err)
+		if len(newMessages) > 0 {
+			if err := s.processMessages(channelID, newMessages); err != nil {
+				return totalMessages, fmt.Errorf("failed to process messages: %w", err)
+			}
+			totalMessages += len(newMessages)
+			logger.Debug.Printf("Processed %d new messages, total so far: %d", len(newMessages), totalMessages)
 		}
-		
-		totalMessages += len(newMessages)
 
-		if nextCursor == "" {
-			logger.Debug.Printf("No more messages to fetch for channel %s", channelID)
-			break
-		}
-		cursor = nextCursor
+		// Add a small delay to prevent hitting rate limits too aggressively
+		time.Sleep(time.Millisecond * 100)
 	}
 
 	return totalMessages, nil
