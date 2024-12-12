@@ -97,9 +97,9 @@ Run Manually:
 
 ```
 .
-├── bin/            # Compiled binary output
-├── cmd/            # Main application entry points
-├── config/         # Configuration files
+├── bin/           # Compiled binary output
+├── cmd/           # Main application entry points
+├── config/        # Configuration files
 ├── data/          # Generated data directory
 │   ├── logs/      # Application logs
 │   └── storage/   # Downloaded file storage
