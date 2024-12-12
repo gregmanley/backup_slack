@@ -8,7 +8,7 @@ import (
 func TestLoad(t *testing.T) {
 	// Test required variables
 	requiredVars := map[string]string{
-		"SLACK_APP_TOKEN": "xoxb-test-token",
+		"SLACK_BOT_TOKEN": "xoxb-test-token",
 		"SLACK_CHANNELS":  "channel1,channel2",
 		"DB_PATH":         "/tmp/db",
 		"STORAGE_PATH":    "/tmp/storage",
@@ -31,8 +31,8 @@ func TestLoad(t *testing.T) {
 		t.Errorf("Expected no error, got %v", err)
 	}
 
-	if cfg.SlackAPIToken != requiredVars["SLACK_APP_TOKEN"] {
-		t.Errorf("Expected token %s, got %s", requiredVars["SLACK_APP_TOKEN"], cfg.SlackAPIToken)
+	if cfg.SlackAPIToken != requiredVars["SLACK_BOT_TOKEN"] {
+		t.Errorf("Expected token %s, got %s", requiredVars["SLACK_BOT_TOKEN"], cfg.SlackAPIToken)
 	}
 
 	if len(cfg.SlackChannels) != 2 {
@@ -40,9 +40,9 @@ func TestLoad(t *testing.T) {
 	}
 
 	// Test missing required variable
-	os.Unsetenv("SLACK_APP_TOKEN")
+	os.Unsetenv("SLACK_BOT_TOKEN")
 	_, err = Load()
 	if err == nil {
-		t.Error("Expected error for missing SLACK_APP_TOKEN, got nil")
+		t.Error("Expected error for missing SLACK_BOT_TOKEN, got nil")
 	}
 }
