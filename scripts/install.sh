@@ -4,7 +4,7 @@
 sudo mkdir -p /opt/backup_slack/{bin,workspaces}
 
 # Copy binary
-sudo cp ./backup_slack /opt/backup_slack/bin/
+sudo cp ./bin/backup_slack /opt/backup_slack/bin/
 sudo chmod +x /opt/backup_slack/bin/backup_slack
 
 # Copy service management script
