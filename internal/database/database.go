@@ -46,6 +46,18 @@ type User struct {
 	FirstSeen   time.Time
 }
 
+type File struct {
+	ID              string
+	MessageID       string
+	OriginalURL     string
+	LocalPath       string
+	FileName        string
+	FileType        string
+	SizeBytes       int64
+	UploadTimestamp time.Time
+	Checksum        string
+}
+
 // New creates a new database connection and ensures schema is up to date
 func New(dbPath string) (*DB, error) {
 	// Ensure database directory exists
@@ -189,4 +201,107 @@ func (db *DB) MessageExists(messageID string) (bool, error) {
 	}
 
 	return exists, nil
+}
+
+// InsertFile stores file metadata in the database
+func (db *DB) InsertFile(file File) error {
+	query := `
+		INSERT INTO files (
+			id, message_id, original_url, local_path, file_name,
+			file_type, size_bytes, upload_timestamp, checksum
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			local_path = excluded.local_path,
+			checksum = excluded.checksum
+	`
+
+	_, err := db.Exec(query,
+		file.ID, file.MessageID, file.OriginalURL, file.LocalPath,
+		file.FileName, file.FileType, file.SizeBytes,
+		file.UploadTimestamp, file.Checksum)
+
+	if err != nil {
+		return fmt.Errorf("failed to insert file: %w", err)
+	}
+	return nil
+}
+
+// GetDuplicateFiles returns files with the same checksum
+func (db *DB) GetDuplicateFiles(checksum string) ([]File, error) {
+	query := `
+		SELECT id, message_id, original_url, local_path, file_name,
+			   file_type, size_bytes, upload_timestamp, checksum
+		FROM files
+		WHERE checksum = ?
+	`
+
+	rows, err := db.Query(query, checksum)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query duplicate files: %w", err)
+	}
+	defer rows.Close()
+
+	var files []File
+	for rows.Next() {
+		var f File
+		err := rows.Scan(&f.ID, &f.MessageID, &f.OriginalURL, &f.LocalPath,
+			&f.FileName, &f.FileType, &f.SizeBytes, &f.UploadTimestamp, &f.Checksum)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan file row: %w", err)
+		}
+		files = append(files, f)
+	}
+
+	return files, nil
+}
+
+// GetOrphanedFiles returns files that don't have an associated message
+func (db *DB) GetOrphanedFiles() ([]File, error) {
+	query := `
+		SELECT f.id, f.message_id, f.original_url, f.local_path, f.file_name,
+			   f.file_type, f.size_bytes, f.upload_timestamp, f.checksum
+		FROM files f
+		LEFT JOIN messages m ON f.message_id = m.id
+		WHERE m.id IS NULL
+	`
+
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query orphaned files: %w", err)
+	}
+	defer rows.Close()
+
+	var files []File
+	for rows.Next() {
+		var f File
+		err := rows.Scan(&f.ID, &f.MessageID, &f.OriginalURL, &f.LocalPath,
+			&f.FileName, &f.FileType, &f.SizeBytes, &f.UploadTimestamp, &f.Checksum)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan file row: %w", err)
+		}
+		files = append(files, f)
+	}
+
+	return files, nil
+}
+
+// DeleteFile removes a file record from the database
+func (db *DB) DeleteFile(fileID string) error {
+	query := `DELETE FROM files WHERE id = ?`
+
+	result, err := db.Exec(query, fileID)
+	if err != nil {
+		return fmt.Errorf("failed to delete file record: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get affected rows: %w", err)
+	}
+
+	if rows == 0 {
+		return fmt.Errorf("no file found with ID %s", fileID)
+	}
+
+	return nil
 }

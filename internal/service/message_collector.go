@@ -146,6 +146,28 @@ func (s *SlackService) processMessages(channelID string, messages []slack.Messag
 				continue
 			}
 		}
+
+		// Process files attached to messages
+		if len(msg.Files) > 0 {
+			for _, file := range msg.Files {
+				dbFile := database.File{
+					ID:              file.ID,
+					MessageID:       msg.Timestamp,
+					OriginalURL:     file.URLPrivateDownload,
+					LocalPath:       s.fileService.storage.GenerateFilePath(channelID, file.ID, file.Filetype, convertSlackTimestamp(msg.Timestamp)),
+					FileName:        file.Name,
+					FileType:        file.Filetype,
+					SizeBytes:       int64(file.Size),
+					UploadTimestamp: convertSlackTimestamp(msg.Timestamp),
+					Checksum:        "", // Will be set after download
+				}
+
+				if err := s.fileService.ProcessFile(dbFile); err != nil {
+					logger.Error.Printf("Failed to process file %s: %v", file.ID, err)
+					continue
+				}
+			}
+		}
 	}
 
 	return nil

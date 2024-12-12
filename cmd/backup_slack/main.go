@@ -54,11 +54,17 @@ func main() {
 
 	logger.Info.Println("Database initialized successfully")
 
-	// Initialize Slack service
-	slackService := service.NewSlackService(cfg.SlackAPIToken, db)
-	if err := slackService.Initialize(cfg.SlackChannels); err != nil {
+	// Initialize Slack service with channels
+	slackService, err := service.NewSlackService(cfg.SlackAPIToken, db, cfg.StoragePath)
+	if err != nil {
 		logger.Error.Fatalf("Failed to initialize Slack service: %v", err)
 	}
+
+	// Initialize channels
+	if err := slackService.Initialize(cfg.SlackChannels); err != nil {
+		logger.Error.Fatalf("Failed to initialize channels: %v", err)
+	}
+
 	logger.Info.Println("Slack service initialized successfully")
 	logger.Info.Printf("Configured to backup %d channels: %v", len(cfg.SlackChannels), cfg.SlackChannels)
 

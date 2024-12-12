@@ -96,3 +96,47 @@ func isImageType(fileType string) bool {
 	}
 	return imageTypes[fileType]
 }
+
+// HandleDuplicate manages duplicate files by creating a hard link
+func (fs *FileStorage) HandleDuplicate(existingPath, newPath string) error {
+	// Ensure the source file exists
+	if !fs.FileExists(existingPath) {
+		return fmt.Errorf("source file does not exist: %s", existingPath)
+	}
+
+	// Remove the target file if it exists
+	if fs.FileExists(newPath) {
+		if err := os.Remove(newPath); err != nil {
+			return fmt.Errorf("failed to remove existing file: %w", err)
+		}
+	}
+
+	// Create hard link
+	if err := os.Link(existingPath, newPath); err != nil {
+		return fmt.Errorf("failed to create hard link: %w", err)
+	}
+
+	return nil
+}
+
+// CleanupOrphanedFile removes a file from the filesystem
+func (fs *FileStorage) CleanupOrphanedFile(path string) error {
+	if !fs.FileExists(path) {
+		return nil // File already gone
+	}
+
+	if err := os.Remove(path); err != nil {
+		return fmt.Errorf("failed to remove orphaned file: %w", err)
+	}
+
+	// Try to remove empty parent directories
+	dir := filepath.Dir(path)
+	for dir != fs.BasePath {
+		if err := os.Remove(dir); err != nil {
+			break // Directory not empty or other error
+		}
+		dir = filepath.Dir(dir)
+	}
+
+	return nil
+}

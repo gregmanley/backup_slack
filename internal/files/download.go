@@ -32,16 +32,16 @@ func NewDownloader(storage *FileStorage) *Downloader {
 }
 
 // DownloadFile downloads a file from Slack and stores it locally
-func (d *Downloader) DownloadFile(metadata FileMetadata, token string) error {
+func (d *Downloader) DownloadFile(metadata FileMetadata, token string) (string, error) {
 	// Check disk space before download
 	if err := d.storage.CheckDiskSpace(metadata.SizeBytes); err != nil {
-		return fmt.Errorf("disk space check failed: %w", err)
+		return "", fmt.Errorf("disk space check failed: %w", err)
 	}
 
 	// Create the request
 	req, err := http.NewRequest("GET", metadata.OriginalURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
 	// Add authorization header
@@ -58,19 +58,17 @@ func (d *Downloader) DownloadFile(metadata FileMetadata, token string) error {
 			continue
 		}
 
-		// Verify checksum
-		if valid, err := d.verifyChecksum(metadata.LocalPath, metadata.Checksum); err != nil {
-			lastErr = fmt.Errorf("checksum verification failed: %w", err)
-			continue
-		} else if !valid {
-			lastErr = fmt.Errorf("checksum mismatch for file %s", metadata.FileName)
+		// Calculate checksum after successful download
+		checksum, err := CalculateChecksum(metadata.LocalPath)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to calculate checksum: %w", err)
 			continue
 		}
 
-		return nil
+		return checksum, nil
 	}
 
-	return fmt.Errorf("failed to download file after %d attempts: %w", maxRetries, lastErr)
+	return "", fmt.Errorf("failed to download file after %d attempts: %w", maxRetries, lastErr)
 }
 
 // downloadWithRetry performs a single download attempt
@@ -110,18 +108,15 @@ func (d *Downloader) downloadWithRetry(req *http.Request, metadata FileMetadata)
 
 // verifyChecksum calculates and verifies the SHA-256 checksum of a file
 func (d *Downloader) verifyChecksum(filePath, expectedChecksum string) (bool, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return false, fmt.Errorf("failed to open file for checksum: %w", err)
-	}
-	defer file.Close()
+	logger.Debug.Printf("Verifying checksum for %s (expected: %s)", filePath, expectedChecksum)
 
-	hash := sha256.New()
-	if _, err := io.Copy(hash, file); err != nil {
+	actualChecksum, err := CalculateChecksum(filePath)
+	if err != nil {
 		return false, fmt.Errorf("failed to calculate checksum: %w", err)
 	}
 
-	actualChecksum := hex.EncodeToString(hash.Sum(nil))
+	logger.Debug.Printf("Checksum comparison - Expected: %s, Actual: %s", expectedChecksum, actualChecksum)
+
 	return actualChecksum == expectedChecksum, nil
 }
 
@@ -139,4 +134,44 @@ func CalculateChecksum(filePath string) (string, error) {
 	}
 
 	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func (d *Downloader) DownloadFileWithRetry(url, destPath, expectedChecksum string, metadata FileMetadata) error {
+	maxRetries := 3
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		logger.Debug.Printf("Download attempt %d/%d for %s", attempt, maxRetries, url)
+
+		if _, err := d.DownloadFile(metadata, ""); err != nil {
+			logger.Debug.Printf("Download attempt %d failed: %v", attempt, err)
+			if attempt == maxRetries {
+				return fmt.Errorf("failed to download file after %d attempts: %w", maxRetries, err)
+			}
+			// Exponential backoff
+			time.Sleep(time.Second * time.Duration(1<<uint(attempt)))
+			continue
+		}
+
+		// Verify checksum
+		match, err := d.verifyChecksum(destPath, expectedChecksum)
+		if err != nil {
+			return fmt.Errorf("failed to verify checksum: %w", err)
+		}
+		if !match {
+			if attempt == maxRetries {
+				return fmt.Errorf("checksum mismatch after %d attempts", maxRetries)
+			}
+			logger.Debug.Printf("Checksum mismatch on attempt %d, retrying...", attempt)
+			continue
+		}
+
+		return nil
+	}
+
+	return fmt.Errorf("failed to download and verify file after %d attempts", maxRetries)
+}
+
+func cleanup(path string) {
+	if err := os.Remove(path); err != nil {
+		logger.Debug.Printf("Failed to cleanup file %s: %v", path, err)
+	}
 }
