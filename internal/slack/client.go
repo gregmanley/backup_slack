@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"backup_slack/internal/logger"
+
 	"github.com/slack-go/slack"
 	"golang.org/x/time/rate"
 )
@@ -57,7 +59,7 @@ func (c *Client) ValidateAuth() (*slack.AuthTestResponse, error) {
 }
 
 // GetChannelMessages fetches messages from a channel since a specific timestamp
-func (c *Client) GetChannelMessages(channelID string, oldest string, cursor string) ([]slack.Message, string, error) {
+func (c *Client) GetChannelMessages(channelID string, latest string, cursor string) ([]slack.Message, string, error) {
 	if err := c.rateLimiter.Wait(c.ctx); err != nil {
 		return nil, "", fmt.Errorf("rate limiter error: %w", err)
 	}
@@ -65,13 +67,22 @@ func (c *Client) GetChannelMessages(channelID string, oldest string, cursor stri
 	params := &slack.GetConversationHistoryParameters{
 		ChannelID: channelID,
 		Limit:     100,
-		Oldest:    oldest,
 		Cursor:    cursor,
+		Latest:    latest, // If empty, will get most recent messages
 	}
+
+	logger.Debug.Printf("Fetching messages: channel=%s cursor=%s latest=%s",
+		channelID, cursor, latest)
 
 	resp, err := c.api.GetConversationHistory(params)
 	if err != nil {
+		logger.Error.Printf("Slack API error for channel %s: %v", channelID, err)
 		return nil, "", fmt.Errorf("failed to get channel history: %w", err)
+	}
+
+	logger.Debug.Printf("Successfully retrieved %d messages from Slack API", len(resp.Messages))
+	if resp.HasMore {
+		logger.Debug.Printf("More messages available, next cursor: %s", resp.ResponseMetadata.Cursor)
 	}
 
 	return resp.Messages, resp.ResponseMetadata.Cursor, nil

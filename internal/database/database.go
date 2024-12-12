@@ -38,6 +38,14 @@ type Message struct {
 	LastEdited  sql.NullTime
 }
 
+type User struct {
+	ID          string
+	Username    string
+	DisplayName string
+	AvatarURL   string
+	FirstSeen   time.Time
+}
+
 // New creates a new database connection and ensures schema is up to date
 func New(dbPath string) (*DB, error) {
 	// Ensure database directory exists
@@ -97,36 +105,88 @@ func (db *DB) InsertChannel(ch Channel) error {
 }
 
 func (db *DB) InsertMessage(msg Message) error {
-	query := `
-		INSERT INTO messages (
-			id, channel_id, user_id, content, timestamp, 
-			thread_ts, message_type, is_deleted, last_edited
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(id) DO UPDATE SET
-			content = excluded.content,
-			is_deleted = excluded.is_deleted,
-			last_edited = excluded.last_edited
-	`
+	// First verify user exists
+	var exists bool
+	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", msg.UserID).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("failed to check user existence: %w", err)
+	}
+	if !exists {
+		logger.Error.Printf("Attempted to insert message with non-existent user ID: %s", msg.UserID)
+		return fmt.Errorf("user %s does not exist", msg.UserID)
+	}
 
-	_, err := db.Exec(query,
+	query := `
+        INSERT INTO messages (
+            id, channel_id, user_id, content, timestamp, 
+            thread_ts, message_type, is_deleted, last_edited
+        ) VALUES (?, ?, ?, ?, datetime(?), ?, ?, ?, datetime(?))
+        ON CONFLICT(id) DO UPDATE SET
+            content = excluded.content,
+            is_deleted = excluded.is_deleted,
+            last_edited = excluded.last_edited
+    `
+
+	lastEdited := sql.NullString{Valid: false}
+	if msg.LastEdited.Valid {
+		lastEdited.String = msg.LastEdited.Time.Format("2006-01-02 15:04:05")
+		lastEdited.Valid = true
+	}
+
+	_, err = db.Exec(query,
 		msg.ID, msg.ChannelID, msg.UserID, msg.Content,
-		msg.Timestamp, msg.ThreadTS, msg.MessageType,
-		msg.IsDeleted, msg.LastEdited,
+		msg.Timestamp.Format("2006-01-02 15:04:05"),
+		msg.ThreadTS, msg.MessageType,
+		msg.IsDeleted, lastEdited,
 	)
 
 	return err
 }
 
 func (db *DB) GetLastMessageTimestamp(channelID string) (time.Time, error) {
-	var timestamp time.Time
-	query := `SELECT COALESCE(MAX(timestamp), datetime('1970-01-01T00:00:00Z')) 
+	var unixTime int64
+	query := `SELECT COALESCE(MAX(CAST(strftime('%s', timestamp) AS INTEGER)), 0)
               FROM messages 
               WHERE channel_id = ?`
 
-	err := db.DB.QueryRow(query, channelID).Scan(&timestamp)
+	err := db.DB.QueryRow(query, channelID).Scan(&unixTime)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to get last message timestamp: %w", err)
 	}
 
+	timestamp := time.Unix(unixTime, 0)
+	logger.Debug.Printf("Retrieved timestamp from database: %v (Unix: %d)",
+		timestamp, unixTime)
+
 	return timestamp, nil
+}
+
+func (db *DB) InsertUser(user User) error {
+	query := `
+        INSERT INTO users (
+            id, username, display_name, avatar_url, first_seen
+        ) VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO NOTHING
+    `
+
+	_, err := db.Exec(query,
+		user.ID, user.Username, user.DisplayName,
+		user.AvatarURL, user.FirstSeen)
+
+	if err != nil {
+		return fmt.Errorf("failed to insert user: %w", err)
+	}
+	return nil
+}
+
+func (db *DB) MessageExists(messageID string) (bool, error) {
+	var exists bool
+	query := `SELECT EXISTS(SELECT 1 FROM messages WHERE id = ?)`
+
+	err := db.QueryRow(query, messageID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check message existence: %w", err)
+	}
+
+	return exists, nil
 }
