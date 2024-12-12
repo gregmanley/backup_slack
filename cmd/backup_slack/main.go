@@ -70,11 +70,12 @@ func main() {
 
 	// Start backing up messages from each channel
 	for _, channelID := range cfg.SlackChannels {
-		logger.Info.Printf("Starting backup for channel %s", channelID)
+		channelName := slackService.GetChannelName(channelID)
+		logger.Info.Printf("Starting backup for channel %s (#%s)", channelID, channelName)
 		if err := slackService.BackupChannelMessages(channelID); err != nil {
-			logger.Error.Printf("Failed to backup channel %s: %v", channelID, err)
+			logger.Error.Printf("Failed to backup channel %s (#%s): %v", channelID, channelName, err)
 			continue
 		}
-		logger.Info.Printf("Completed backup for channel %s", channelID)
+		logger.Info.Printf("Completed backup for channel %s (#%s)", channelID, channelName)
 	}
 }

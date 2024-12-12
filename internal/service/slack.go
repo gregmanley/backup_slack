@@ -15,6 +15,7 @@ type SlackService struct {
 	client      *slack.Client
 	db          *database.DB
 	fileService *FileService
+	channels    map[string]slackapi.Channel
 }
 
 func NewSlackService(token string, db *database.DB, storagePath string) (*SlackService, error) {
@@ -52,6 +53,9 @@ func (s *SlackService) Initialize(targetChannelIDs []string) error {
 	for _, ch := range channels {
 		channelMap[ch.ID] = ch
 	}
+
+	// Store channels map
+	s.channels = channelMap
 
 	// Store channels in database
 	for _, id := range targetChannelIDs {
@@ -118,13 +122,22 @@ func (s *SlackService) storeChannels(channels []slackapi.Channel) error {
 
 // BackupChannelMessages initiates message collection for a channel
 func (s *SlackService) BackupChannelMessages(channelID string) error {
-	logger.Info.Printf("Starting message backup for channel %s", channelID)
+	channelName := s.channels[channelID].Name
+	logger.Info.Printf("Starting message backup for channel %s (#%s)", channelID, channelName)
 
 	messageCount, err := s.CollectMessages(channelID)
 	if err != nil {
-		return fmt.Errorf("failed to backup messages for channel %s: %w", channelID, err)
+		return fmt.Errorf("failed to backup messages for channel %s (#%s): %w", channelID, channelName, err)
 	}
 
-	logger.Info.Printf("Backed up %d messages for channel %s", messageCount, channelID)
+	logger.Info.Printf("Backed up %d messages for channel %s (#%s)", messageCount, channelID, channelName)
 	return nil
+}
+
+// GetChannelName returns the name of a channel given its ID
+func (s *SlackService) GetChannelName(channelID string) string {
+	if channel, ok := s.channels[channelID]; ok {
+		return channel.Name
+	}
+	return channelID // Fallback to ID if name not found
 }
