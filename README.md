@@ -75,7 +75,7 @@ Note: Keep your token secret
    # Replace workspace1 with your workspace name
    sudo mkdir -p /opt/backup_slack/workspaces/workspace1
    sudo cp .env.example /opt/backup_slack/workspaces/workspace1/.env
-   sudo nano /opt/backup_slack/workspaces/workspace1/.env  # Edit configuration
+   sudo nano /opt/backup_slack/workspaces/workspace1/.env  # Edit configuration to add slack bot token and channels
    ```
 4. Start the service:
    ```bash
