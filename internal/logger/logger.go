@@ -12,6 +12,7 @@ type LogLevel int
 
 const (
 	LevelError LogLevel = iota
+	LevelWarn
 	LevelInfo
 	LevelDebug
 )
@@ -20,6 +21,7 @@ var (
 	Info  *log.Logger
 	Error *log.Logger
 	Debug *log.Logger
+	Warn  *log.Logger
 	level LogLevel
 )
 
@@ -29,6 +31,8 @@ func ParseLogLevel(lvl string) LogLevel {
 		return LevelDebug
 	case "ERROR":
 		return LevelError
+	case "WARN":
+		return LevelWarn
 	default:
 		return LevelInfo
 	}
@@ -58,6 +62,13 @@ func Init(logPath string, logLevel LogLevel) error {
 
 	// Always enable Error logging
 	Error = log.New(logFile, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+
+	// Configure Warn logger based on level
+	warnWriter := io.Writer(&nullWriter{})
+	if level >= LevelWarn {
+		warnWriter = logFile
+	}
+	Warn = log.New(warnWriter, "WARN: ", log.Ldate|log.Ltime|log.Lshortfile)
 
 	// Configure Info logger based on level
 	infoWriter := io.Writer(&nullWriter{})

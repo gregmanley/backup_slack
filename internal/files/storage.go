@@ -77,6 +77,12 @@ func (fs *FileStorage) CheckDiskSpace(requiredBytes int64) error {
 	return nil
 }
 
+// FileExists checks if a file exists at the given path
+func (fs *FileStorage) FileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 // isImageType checks if the file type is an image
 func isImageType(fileType string) bool {
 	imageTypes := map[string]bool{
