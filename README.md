@@ -42,6 +42,7 @@ Note: Keep your token secret
    ```bash
    git clone https://github.com/gregmanley/backup_slack.git
    cd backup_slack
+   ```
 
 2. Install dependencies
    ```bash
@@ -54,31 +55,32 @@ Note: Keep your token secret
    ```
 
 4. Configure the application by editing `.env`:
-```
-SLACK_API_TOKEN=xoxb-your-token-here
-SLACK_CHANNELS=C12345678,C87654321
-LOG_LEVEL=INFO
-DB_PATH=./data/slack_backup.db
-STORAGE_PATH=./data/storage
-LOG_PATH=./data/logs/backup.log
-```
+   ```
+   SLACK_API_TOKEN=xoxb-your-token-here
+   SLACK_CHANNELS=C12345678,C87654321
+   LOG_LEVEL=INFO
+   DB_PATH=./data/slack_backup.db
+   STORAGE_PATH=./data/storage
+   LOG_PATH=./data/logs/backup.log
+   ```
 
 #### Installaion Script
 1. Build the binary
 2. Run the installation script:
    ```bash
    sudo ./scripts/install.sh
+   ```
 3. Create workspace directories and .env files for each workspace:
-```bash
-# Replace workspace1 with your workspace name
-sudo mkdir -p /opt/backup_slack/workspaces/workspace1
-sudo cp .env.example /opt/backup_slack/workspaces/workspace1/.env
-sudo nano /opt/backup_slack/workspaces/workspace1/.env  # Edit configuration
-```
+   ```bash
+   # Replace workspace1 with your workspace name
+   sudo mkdir -p /opt/backup_slack/workspaces/workspace1
+   sudo cp .env.example /opt/backup_slack/workspaces/workspace1/.env
+   sudo nano /opt/backup_slack/workspaces/workspace1/.env  # Edit configuration
+   ```
 4. Start the service:
-```bash
-sudo /opt/backup_slack/manage-services.sh start
-```
+   ```bash
+   sudo /opt/backup_slack/manage-services.sh start
+   ```
 
 
 ### Building and Running
