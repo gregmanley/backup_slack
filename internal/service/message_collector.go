@@ -189,17 +189,21 @@ func (s *SlackService) storeUsers(users map[string]struct{}) error {
 }
 
 func (s *SlackService) collectThreadReplies(channelID, threadTS string) error {
-	replies, err := s.client.GetMessageReplies(channelID, threadTS)
-	if err != nil {
-		return fmt.Errorf("failed to fetch thread replies: %w", err)
+	maxRetries := 3
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		replies, err := s.client.GetMessageReplies(channelID, threadTS)
+		if err != nil {
+			logger.Warn.Printf("Attempt %d/%d: Failed to collect thread replies: %v",
+				attempt+1, maxRetries, err)
+			time.Sleep(time.Second * time.Duration(1<<uint(attempt)))
+			continue
+		}
+		if len(replies) > 1 {
+			return s.processMessages(channelID, replies[1:])
+		}
+		return nil
 	}
-
-	// Skip first message as it's the parent
-	if len(replies) > 1 {
-		return s.processMessages(channelID, replies[1:])
-	}
-
-	return nil
+	return fmt.Errorf("failed to collect thread replies after %d attempts", maxRetries)
 }
 
 func convertSlackTimestamp(ts string) time.Time {

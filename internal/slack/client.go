@@ -18,8 +18,7 @@ type Client struct {
 }
 
 func NewClient(token string) *Client {
-	// Create rate limiter: 100 requests per minute as per requirements
-	limiter := rate.NewLimiter(rate.Every(time.Minute/100), 100)
+	limiter := rate.NewLimiter(rate.Every(time.Minute/50), 50)
 
 	return &Client{
 		api:         slack.New(token),
@@ -28,83 +27,115 @@ func NewClient(token string) *Client {
 	}
 }
 
+func (c *Client) retryWithBackoff(f func() error) error {
+	maxRetries := 5
+	baseDelay := time.Second
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if err := c.rateLimiter.Wait(c.ctx); err != nil {
+			return fmt.Errorf("rate limiter error: %w", err)
+		}
+
+		err := f()
+		if err == nil {
+			return nil
+		}
+
+		// Handle rate limits
+		if rateLimitErr, ok := err.(*slack.RateLimitedError); ok {
+			delay := time.Duration(rateLimitErr.RetryAfter) * time.Second
+			logger.Debug.Printf("Rate limited, waiting %v before retry", delay)
+			time.Sleep(delay)
+			continue
+		}
+
+		// Exponential backoff for other errors
+		delay := baseDelay * time.Duration(1<<uint(attempt))
+		time.Sleep(delay)
+	}
+	return fmt.Errorf("failed after %d retries", maxRetries)
+}
+
 // GetChannels returns all channels the bot has access to
 func (c *Client) GetChannels() ([]slack.Channel, error) {
-	if err := c.rateLimiter.Wait(c.ctx); err != nil {
-		return nil, fmt.Errorf("rate limiter error: %w", err)
-	}
-
-	channels, _, err := c.api.GetConversations(&slack.GetConversationsParameters{
-		Types: []string{"public_channel", "private_channel"},
+	var channels []slack.Channel
+	err := c.retryWithBackoff(func() error {
+		var err error
+		channels, _, err = c.api.GetConversations(&slack.GetConversationsParameters{
+			Types: []string{"public_channel", "private_channel"},
+		})
+		return err
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get channels: %w", err)
 	}
-
 	return channels, nil
 }
 
 // ValidateAuth checks if the token is valid and returns basic auth info
 func (c *Client) ValidateAuth() (*slack.AuthTestResponse, error) {
-	if err := c.rateLimiter.Wait(c.ctx); err != nil {
-		return nil, fmt.Errorf("rate limiter error: %w", err)
-	}
-
-	resp, err := c.api.AuthTest()
+	var resp *slack.AuthTestResponse
+	err := c.retryWithBackoff(func() error {
+		var err error
+		resp, err = c.api.AuthTest()
+		return err
+	})
 	if err != nil {
 		return nil, fmt.Errorf("auth validation failed: %w", err)
 	}
-
 	return resp, nil
 }
 
 // GetChannelMessages fetches messages from a channel since a specific timestamp
 func (c *Client) GetChannelMessages(channelID string, latest string, cursor string) ([]slack.Message, string, error) {
-	if err := c.rateLimiter.Wait(c.ctx); err != nil {
-		return nil, "", fmt.Errorf("rate limiter error: %w", err)
-	}
+	var messages []slack.Message
+	var nextCursor string
+	err := c.retryWithBackoff(func() error {
+		params := &slack.GetConversationHistoryParameters{
+			ChannelID: channelID,
+			Limit:     200, // Increased from 100 to 200 for better performance
+			Cursor:    cursor,
+			Latest:    latest, // If empty, will get most recent messages
+			Inclusive: false,
+		}
 
-	params := &slack.GetConversationHistoryParameters{
-		ChannelID: channelID,
-		Limit:     200, // Increased from 100 to 200 for better performance
-		Cursor:    cursor,
-		Latest:    latest, // If empty, will get most recent messages
-		Inclusive: false,
-	}
+		logger.Debug.Printf("Fetching messages: channel=%s cursor=%s latest=%s",
+			channelID, cursor, latest)
 
-	logger.Debug.Printf("Fetching messages: channel=%s cursor=%s latest=%s",
-		channelID, cursor, latest)
+		resp, err := c.api.GetConversationHistory(params)
+		if err != nil {
+			logger.Error.Printf("Slack API error for channel %s: %v", channelID, err)
+			return fmt.Errorf("failed to get channel history: %w", err)
+		}
 
-	resp, err := c.api.GetConversationHistory(params)
+		logger.Debug.Printf("Successfully retrieved %d messages from Slack API", len(resp.Messages))
+		messages = resp.Messages
+		nextCursor = resp.ResponseMetadata.Cursor
+		if resp.HasMore {
+			logger.Debug.Printf("More messages available, next cursor: %s", nextCursor)
+		}
+		return nil
+	})
 	if err != nil {
-		logger.Error.Printf("Slack API error for channel %s: %v", channelID, err)
-		return nil, "", fmt.Errorf("failed to get channel history: %w", err)
+		return nil, "", err
 	}
-
-	logger.Debug.Printf("Successfully retrieved %d messages from Slack API", len(resp.Messages))
-	nextCursor := resp.ResponseMetadata.Cursor
-	if resp.HasMore {
-		logger.Debug.Printf("More messages available, next cursor: %s", nextCursor)
-	}
-
-	return resp.Messages, nextCursor, nil
+	return messages, nextCursor, nil
 }
 
 // GetMessageReplies fetches all replies in a thread
 func (c *Client) GetMessageReplies(channelID, threadTS string) ([]slack.Message, error) {
-	if err := c.rateLimiter.Wait(c.ctx); err != nil {
-		return nil, fmt.Errorf("rate limiter error: %w", err)
-	}
-
-	params := &slack.GetConversationRepliesParameters{
-		ChannelID: channelID,
-		Timestamp: threadTS,
-	}
-
-	messages, _, _, err := c.api.GetConversationReplies(params)
+	var messages []slack.Message
+	err := c.retryWithBackoff(func() error {
+		params := &slack.GetConversationRepliesParameters{
+			ChannelID: channelID,
+			Timestamp: threadTS,
+		}
+		var err error
+		messages, _, _, err = c.api.GetConversationReplies(params)
+		return err
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get thread replies: %w", err)
 	}
-
 	return messages, nil
 }

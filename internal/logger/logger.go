@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type LogLevel int
@@ -85,4 +86,15 @@ func Init(logPath string, logLevel LogLevel) error {
 	Debug = log.New(debugWriter, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile)
 
 	return nil
+}
+
+// Add rate limit specific logging
+func LogRateLimit(retryAfter time.Duration, operation string) {
+	Warn.Printf("Rate limit hit during %s, waiting %v seconds",
+		operation, retryAfter.Seconds())
+}
+
+func LogRetryAttempt(attempt, maxRetries int, operation string) {
+	Debug.Printf("Retry attempt %d/%d for operation: %s",
+		attempt+1, maxRetries, operation)
 }
