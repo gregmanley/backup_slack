@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -66,7 +68,10 @@ func Load() (*Config, error) {
 	// If LogDir not explicitly set, use default based on environment
 	if c.LogDir == "" {
 		if c.Environment == "production" {
-			c.LogDir = "/var/log/backup_slack"
+			// Get workspace name from working directory
+			workDir, _ := os.Getwd()
+			workspace := filepath.Base(workDir)
+			c.LogDir = filepath.Join("/var/log/backup_slack", workspace)
 		} else {
 			c.LogDir = "./logs"
 		}

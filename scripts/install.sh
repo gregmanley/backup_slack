@@ -2,6 +2,7 @@
 
 # Create directory structure
 sudo mkdir -p /opt/backup_slack/{bin,workspaces}
+sudo mkdir -p /var/log/backup_slack
 
 # Copy binary
 sudo cp ./bin/backup_slack /opt/backup_slack/bin/
@@ -14,6 +15,8 @@ sudo chmod +x /opt/backup_slack/manage-services.sh
 # Create service user
 sudo useradd -r -s /bin/false backup-slack
 sudo chown -R backup-slack:backup-slack /opt/backup_slack
+sudo chown -R backup-slack:backup-slack /var/log/backup_slack
+sudo chmod 755 /var/log/backup_slack
 
 # Install systemd service template
 sudo cp ./scripts/systemd/backup-slack@.service /etc/systemd/system/
