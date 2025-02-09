@@ -52,6 +52,7 @@ func Init(logPath string, logLevel LogLevel) error {
 		return err
 	}
 
+	// Open log file with 0644 permissions
 	logFile, err := os.OpenFile(
 		filepath.Join(logPath, "backup_slack.log"),
 		os.O_CREATE|os.O_WRONLY|os.O_APPEND,

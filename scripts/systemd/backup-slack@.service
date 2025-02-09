@@ -8,9 +8,11 @@ User=backup-slack
 Group=backup-slack
 WorkingDirectory=/opt/backup_slack/workspaces/%i
 Environment=ENV_FILE=/opt/backup_slack/workspaces/%i/.env
+UMask=0022
 ExecStart=/opt/backup_slack/bin/backup_slack
 Restart=always
 RestartSec=86400
+
 
 [Install]
 WantedBy=multi-user.target

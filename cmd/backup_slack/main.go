@@ -21,8 +21,8 @@ func init() {
 }
 
 func main() {
-	// Create data directories
-	dirs := []string{"./data", "./data/logs", "./data/storage"}
+	// Create only essential data directories
+	dirs := []string{"./data", "./data/storage"}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			log.Fatalf("Failed to create directory %s: %v", dir, err)
@@ -35,8 +35,8 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	// Initialize logger with log level
-	if err := logger.Init(cfg.LogPath, logger.ParseLogLevel(cfg.LogLevel)); err != nil {
+	// Initialize logger with configured log directory and level
+	if err := logger.Init(cfg.LogDir, logger.ParseLogLevel(cfg.LogLevel)); err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
 

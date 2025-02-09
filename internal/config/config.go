@@ -15,6 +15,8 @@ type Config struct {
 	MaxRetries    int
 	BatchSize     int
 	LogLevel      string
+	Environment   string
+	LogDir        string // New field for explicit log directory
 }
 
 // Load returns a Config struct populated with current configuration
@@ -54,6 +56,21 @@ func Load() (*Config, error) {
 	c.MaxRetries = getEnvAsIntOrDefault("MAX_RETRIES", 3)
 	c.BatchSize = getEnvAsIntOrDefault("BATCH_SIZE", 100)
 	c.LogLevel = getEnvOrDefault("LOG_LEVEL", "INFO")
+
+	// Environment with default
+	c.Environment = getEnvOrDefault("ENVIRONMENT", "development")
+
+	// Get explicit log directory if specified
+	c.LogDir = getEnvOrDefault("LOG_DIR", "")
+
+	// If LogDir not explicitly set, use default based on environment
+	if c.LogDir == "" {
+		if c.Environment == "production" {
+			c.LogDir = "/var/log/backup_slack"
+		} else {
+			c.LogDir = "./logs"
+		}
+	}
 
 	if len(missingVars) > 0 {
 		return nil, fmt.Errorf("missing required environment variables: %s", strings.Join(missingVars, ", "))
